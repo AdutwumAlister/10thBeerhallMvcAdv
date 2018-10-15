@@ -2,33 +2,39 @@
 using System.Security.Claims;
 using System.Text.Encodings.Web;
 using System.Threading.Tasks;
+using Beerhall.Models.Domain;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.UI.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.AspNetCore.Mvc.Rendering;
+using System.Linq;
 using Microsoft.Extensions.Logging;
 
-namespace Beerhall.Areas.Identity.Pages.Account
-{
+namespace Beerhall.Areas.Identity.Pages.Account {
     [AllowAnonymous]
-    public class RegisterModel : PageModel
-    {
+    public class RegisterModel : PageModel {
         private readonly SignInManager<IdentityUser> _signInManager;
         private readonly UserManager<IdentityUser> _userManager;
         private readonly ILogger<RegisterModel> _logger;
         private readonly IEmailSender _emailSender;
+        private readonly ICustomerRepository _customerRepository;
+        private readonly ILocationRepository _locationRepository;
 
         public RegisterModel(
             UserManager<IdentityUser> userManager,
             SignInManager<IdentityUser> signInManager,
             ILogger<RegisterModel> logger,
-            IEmailSender emailSender)
-        {
+            IEmailSender emailSender,
+            ICustomerRepository customerRepository,
+            ILocationRepository locationRepository) {
             _userManager = userManager;
             _signInManager = signInManager;
             _logger = logger;
             _emailSender = emailSender;
+            _customerRepository = customerRepository;
+            _locationRepository = locationRepository;
         }
 
         [BindProperty]
@@ -36,8 +42,7 @@ namespace Beerhall.Areas.Identity.Pages.Account
 
         public string ReturnUrl { get; set; }
 
-        public class InputModel
-        {
+        public class InputModel {
             [Required]
             [EmailAddress]
             [Display(Name = "Email")]
@@ -53,25 +58,50 @@ namespace Beerhall.Areas.Identity.Pages.Account
             [Display(Name = "Confirm password")]
             [Compare("Password", ErrorMessage = "The password and confirmation password do not match.")]
             public string ConfirmPassword { get; set; }
+
+            [Required]
+            [StringLength(100)]
+            public string Name { get; set; }
+            [Required]
+            [Display(Name = "First name")]
+            [StringLength(100)]
+            public string FirstName { get; set; }
+            [StringLength(100)]
+            public string Street { get; set; }
+            [Display(Name = "Location")]
+            public string PostalCode { get; set; }
+
         }
 
-        public void OnGet(string returnUrl = null)
-        {
+        public void OnGet(string returnUrl = null) {
             ReturnUrl = returnUrl;
+            ViewData["Locations"] = new SelectList(
+              _locationRepository.GetAll().OrderBy(l => l.Name),
+              nameof(Location.PostalCode),
+              nameof(Location.Name),
+              null);
+
         }
 
-        public async Task<IActionResult> OnPostAsync(string returnUrl = null)
-        {
+        public async Task<IActionResult> OnPostAsync(string returnUrl = null) {
             returnUrl = returnUrl ?? Url.Content("~/");
-            if (ModelState.IsValid)
-            {
+            if (ModelState.IsValid) {
                 var user = new IdentityUser { UserName = Input.Email, Email = Input.Email };
                 var result = await _userManager.CreateAsync(user, Input.Password);
                 if (result.Succeeded)
                     result = await _userManager.AddClaimAsync(user, new Claim(ClaimTypes.Role, "customer"));
-                if (result.Succeeded)
-                {
+                if (result.Succeeded) {
                     _logger.LogInformation("User created a new account with password.");
+
+                    var customer = new Customer {
+                        Email = Input.Email,
+                        Name = Input.Name,
+                        FirstName = Input.FirstName,
+                        Street = Input.Street,
+                        Location = _locationRepository.GetBy(Input.PostalCode)
+                    };
+                    _customerRepository.Add(customer);
+                    _customerRepository.SaveChanges();
 
                     var code = await _userManager.GenerateEmailConfirmationTokenAsync(user);
                     var callbackUrl = Url.Page(
@@ -86,8 +116,7 @@ namespace Beerhall.Areas.Identity.Pages.Account
                     await _signInManager.SignInAsync(user, isPersistent: false);
                     return LocalRedirect(returnUrl);
                 }
-                foreach (var error in result.Errors)
-                {
+                foreach (var error in result.Errors) {
                     ModelState.AddModelError(string.Empty, error.Description);
                 }
             }
