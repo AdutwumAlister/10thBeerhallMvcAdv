@@ -5,16 +5,19 @@ using Beerhall.Models.CartViewModels;
 using Beerhall.Filters;
 using Microsoft.AspNetCore.Authorization;
 using System.Collections.Generic;
+using System;
 
 namespace Beerhall.Controllers {
     [ServiceFilter(typeof(CartSessionFilter))]
     public class CartController : Controller {
         private readonly IBeerRepository _beerRepository;
         private readonly ILocationRepository _locationRepository;
+        private readonly ICustomerRepository _customerRepository;
 
-        public CartController(IBeerRepository beerRepository, ILocationRepository locationRepository) {
+        public CartController(IBeerRepository beerRepository, ILocationRepository locationRepository, ICustomerRepository customerRepository) {
             _beerRepository = beerRepository;
             _locationRepository = locationRepository;
+            _customerRepository = customerRepository;
         }
 
         public IActionResult Index(Cart cart) {
@@ -57,5 +60,12 @@ namespace Beerhall.Controllers {
             IEnumerable<Location> locations = _locationRepository.GetAll().OrderBy(l => l.Name).ToList();
             return View(new CheckoutViewModel(locations, new ShippingViewModel()));
         }
+
+        [HttpPost, Authorize(Policy = "Customer")]
+        [ServiceFilter(typeof(CustomerFilter))]
+        public IActionResult Checkout(Customer customer, Cart cart, [Bind(Prefix = "ShippingViewModel")]ShippingViewModel shippingVm) {
+            throw new NotImplementedException();
+        }
+
     }
 }
