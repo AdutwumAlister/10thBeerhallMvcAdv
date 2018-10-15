@@ -37,7 +37,7 @@ namespace Beerhall {
                 options.AddPolicy("AdminOnly", policy => policy.RequireClaim(ClaimTypes.Role, "admin"));
                 options.AddPolicy("Customer", policy => policy.RequireClaim(ClaimTypes.Role, "customer"));
             });
-
+            services.AddSession();
             services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_2_1);
 
             services.AddScoped<BeerhallDataInitializer>();
@@ -60,7 +60,7 @@ namespace Beerhall {
             app.UseHttpsRedirection();
             app.UseStaticFiles();
             app.UseCookiePolicy();
-
+            app.UseSession();
             app.UseAuthentication();
 
             app.UseMvc(routes => {
